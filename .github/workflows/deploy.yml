@@ -3,22 +3,31 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - master
+      - master  # or 'main' if your default branch is main
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true      
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Build Docker image
-        run: |
-          docker build -t my-app .
+      # 2️⃣ Copy app to EC2
+      - name: Copy app to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "."
+          target: "/home/ec2-user/app"
 
+      # 3️⃣ SSH and deploy Docker
       - name: SSH into EC2 and Deploy
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -26,7 +35,8 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            docker stop my-app || true
-            docker rm my-app || true
-            docker build -t my-app .
-            docker run -d -p 3000:3000 --name my-app my-app
+            cd /home/ec2-user/app
+            sudo docker stop my-app || true
+            sudo docker rm my-app || true
+            sudo docker build -t my-app .
+            sudo docker run -d -p 3000:3000 --name my-app my-app
